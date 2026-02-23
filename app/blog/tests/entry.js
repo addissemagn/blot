@@ -92,6 +92,17 @@ describe("entry", function () {
         }
     });
 
+    it("renders canonical unicode URLs without redirect", async function () {
+
+        await this.write({path: '/grüße.txt', content: 'Link: /grüße\nHello, Grüße!'});
+
+        const res = await this.get('/grüße', {redirect: 'manual'});
+        const body = await res.text();
+
+        expect(res.status).toEqual(200);
+        expect(body).toContain('Hello, Grüße!');
+    });
+
     it("does not crash when the URL contains malformed percent-encoding", async function () {
 
         await this.write({ path: '/malformed.txt', content: 'Hello!' });
@@ -108,6 +119,17 @@ describe("entry", function () {
         if (error) throw error;
 
         expect(res.status).toEqual(400);
+    });
+
+    it("resolves a permalink with a literal percent-encoded token after one decode", async function () {
+
+        await this.write({ path: '/encoded.txt', content: 'Link: /a%2520b\nHello, encoded!' });
+
+        const res = await this.get('/a%2520b', { redirect: 'manual' });
+        const body = await res.text();
+
+        expect(res.status).toEqual(200);
+        expect(body).toContain('Hello, encoded!');
     });
 
     it("adds dependency when URL is deduplicated during rename", async function () {
