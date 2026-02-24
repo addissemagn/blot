@@ -120,6 +120,9 @@ dashboard.get("/redirect", function (req, res) {
   });
 
   if (req.query.full_access) {
+    if (!config.dropbox.full || !config.dropbox.full.key || !config.dropbox.full.secret) {
+      return res.status(400).send("Full access mode is not configured. Please use app folder mode.");
+    }
     key = config.dropbox.full.key;
     secret = config.dropbox.full.secret;
     redirectUri += "?full_access=true";

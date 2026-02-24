@@ -91,6 +91,9 @@ site.post("/webhook", function (req, res) {
   var secret;
 
   if (!!req.query.full_access) {
+    if (!config.dropbox.full || !config.dropbox.full.secret) {
+      return res.status(400).send("Full access mode is not configured.");
+    }
     secret = config.dropbox.full.secret;
   } else {
     secret = config.dropbox.app.secret;

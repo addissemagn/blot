@@ -5,6 +5,10 @@ const { Dropbox } = require("dropbox");
 module.exports = async function getAccount(account) {
   const { code, full_access, redirectUri } = account;
   
+  if (full_access && (!config.dropbox.full || !config.dropbox.full.key || !config.dropbox.full.secret)) {
+    throw new Error("Full access mode is not configured. Please use app folder mode.");
+  }
+
   const clientId = full_access
     ? config.dropbox.full.key
     : config.dropbox.app.key;

@@ -9,11 +9,11 @@ var clients = {
 
 // If we have specified the required
 // configuration to run the Dropbox app
+// At minimum, we need app folder credentials
+// Full access credentials are optional (only needed if users want full access)
 if (
   config.dropbox.app.key &&
-  config.dropbox.app.secret &&
-  config.dropbox.full.key &&
-  config.dropbox.full.secret
+  config.dropbox.app.secret
 ) {
   clients.dropbox = require("./dropbox");
 }

@@ -24,11 +24,11 @@ module.exports = function (blogID, callback) {
     }
 
     let clientId = account.full_access
-      ? config.dropbox.full.key
+      ? (config.dropbox.full && config.dropbox.full.key ? config.dropbox.full.key : config.dropbox.app.key)
       : config.dropbox.app.key;
 
     let clientSecret = account.full_access
-      ? config.dropbox.full.secret
+      ? (config.dropbox.full && config.dropbox.full.secret ? config.dropbox.full.secret : config.dropbox.app.secret)
       : config.dropbox.app.secret;
 
     client.auth.setClientId(clientId);
