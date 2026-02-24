@@ -100,6 +100,8 @@ module.exports = {
     email: process.env.BLOT_ADMIN_EMAIL,
   },
 
+  free_signup_email: process.env.BLOT_FREE_SIGNUP_EMAIL,
+
   dropbox: {
     app: {
       key: process.env.BLOT_DROPBOX_APP_KEY,

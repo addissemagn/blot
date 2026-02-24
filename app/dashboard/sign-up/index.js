@@ -85,26 +85,42 @@ paymentForm.get(function (req, res, next) {
   )
     return res.redirect(req.baseUrl + passwordForm.path);
 
-  if (!config.stripe.key) {
-    console.error("Warning: Stripe key is not set");
+  // Allow sign-up page if Stripe is configured OR free sign-up email is configured
+  if (!config.stripe.key && !config.free_signup_email) {
+    console.error("Warning: Stripe key is not set and no free sign-up email configured");
     return res.redirect('/');
   }
 
   res.locals.title = "Sign up";
   res.locals.menu = { "sign-up": "selected" };
   res.locals.error = req.query.error;
-  res.locals.stripe_key = config.stripe.key;
+  res.locals.stripe_key = config.stripe.key; // May be null if free sign-up email is set
   res.locals.paypal_plan = config.paypal.plan;
   res.locals.paypal_client_id = config.paypal.client_id;
+  res.locals.free_signup_email = config.free_signup_email; // Pass to template for frontend check
   res.render("dashboard/sign-up");
 });
 
 paymentForm.post(validateEmail, function (req, res, next) {
+  const email = req.email;
+  
+  // Allow free sign-up only for specific email (if configured)
+  if (config.free_signup_email && email === config.free_signup_email) {
+    req.session.email = email;
+    req.session.subscription = {}; // Empty subscription for free account
+    return res.redirect(req.baseUrl + passwordForm.path);
+  }
+
+  // For everyone else, require payment
+  if (!config.stripe.key) {
+    return next(new Error("Payment is required. Stripe is not configured."));
+  }
+
   // Card is a stripe token generated on the client
   const card = req.body && req.body.stripeToken;
 
   if (!card) return next(new Error(BAD_CHARGE));
-  const email = req.email;
+  
   const info = {
     card,
     email,
@@ -136,6 +152,16 @@ paymentForm.post(validateEmail, function (req, res, next) {
 });
 
 passwordForm.all(function (req, res, next) {
+  // Allow free sign-up only for specific email (if configured)
+  if (config.free_signup_email && req.session && req.session.email === config.free_signup_email) {
+    // Set empty subscription if not already set
+    if (!req.session.subscription && !req.session.paypal) {
+      req.session.subscription = {};
+    }
+    return next();
+  }
+
+  // Normal flow: require payment
   if (
     !req.session ||
     !req.session.email ||

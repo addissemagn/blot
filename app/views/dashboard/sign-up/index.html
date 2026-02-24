@@ -246,6 +246,16 @@
 
     }
 
+    // Allow free sign-up for specific email (if configured)
+    var email = document.querySelector('.email').value.trim().toLowerCase();
+    {{#free_signup_email}}
+    if (email === '{{free_signup_email}}') {
+      // Skip Stripe payment for this email
+      form.submit();
+      return;
+    }
+    {{/free_signup_email}}
+
     stripe.createToken(card).then(function(result) {
 
       if (result.error) {
