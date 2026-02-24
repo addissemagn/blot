@@ -121,6 +121,23 @@ describe("backlinks", function () {
     expect(body).toContain("Backlinks:");
     expect(body).toContain("Linker");
   });
+
+  it("renders backlinks when the linking source has umlauts in its filename", async function () {
+    await this.write({ path: "/target.txt", content: "Title: Target\n\nContent." });
+    await this.write({
+      path: "/grüße-linker.txt",
+      content:
+        'Title: Grüße Linker\n\n[markdown link](/target) and <a href="/target">html link</a>',
+    });
+    await this.template(backlinksTemplate);
+
+    const res = await this.get("/target");
+    const body = await res.text();
+
+    expect(res.status).toEqual(200);
+    expect(body).toContain("Backlinks:");
+    expect(body).toContain("Grüße Linker");
+  });
 });
 
 describe("backlinks edge cases", function () {
