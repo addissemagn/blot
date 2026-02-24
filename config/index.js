@@ -55,7 +55,10 @@ module.exports = {
   blot_directory: BLOT_DIRECTORY,
   data_directory: BLOT_DATA_DIRECTORY,
   views_directory: BLOT_DIRECTORY + "/app/views-built",
-  tmp_directory: process.env.BLOT_TMP_DIRECTORY || BLOT_DATA_DIRECTORY + "/tmp",
+  // In serverless environments (like Vercel), use /tmp as it's the only writable directory
+  // Detect serverless by checking if we're in /var/task (Vercel) or if /tmp exists and is writable
+  tmp_directory: process.env.BLOT_TMP_DIRECTORY || 
+    (process.cwd().startsWith('/var/task') ? '/tmp' : BLOT_DATA_DIRECTORY + "/tmp"),
   log_directory:
     process.env.BLOT_LOG_DIRECTORY || BLOT_DATA_DIRECTORY + "/logs",
   blog_static_files_dir: BLOT_DATA_DIRECTORY + "/static",

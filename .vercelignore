@@ -1,0 +1,16 @@
+# Exclude test files - not needed in production
+app/**/tests/
+app/**/*.test.js
+app/**/test.js
+
+# Exclude build test artifacts
+app/build/tests/
+
+# Font files (317MB) are kept and served as static assets (not bundled in serverless function)
+# This avoids the 250MB serverless function size limit since fonts are served via express.static
+# Only exclude test/build files from fonts directory
+app/blog/static/fonts/**/*.html
+app/blog/static/fonts/**/test.js
+app/blog/static/fonts/**/build.js
+app/blog/static/fonts/**/parse.js
+app/blog/static/fonts/README
