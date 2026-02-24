@@ -8,6 +8,7 @@
   },
   "main": "app/index.js",
   "scripts": {
+    "build": "node scripts/vercel-build.js",
     "download-folder": "./scripts/development/download-folder.sh",
     "test": "./scripts/tests/invoke.sh",
     "start": "node app/server.js",

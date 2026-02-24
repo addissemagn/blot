@@ -62,7 +62,11 @@ module.exports = function (server) {
       if (req.hostname.endsWith(config.host)) {
         res.sendFile(VIEW_DIR + "/error-no-blog.html");
       } else {
-        res.sendFile(VIEW_DIR + "/error-almost-connected.html");
+        // Replace hardcoded blot.im URLs with configured host
+        const fs = require("fs");
+        let html = fs.readFileSync(VIEW_DIR + "/error-almost-connected.html", "utf8");
+        html = html.replace(/https:\/\/blot\.im/g, config.protocol + config.host);
+        res.send(html);
       }
 
       return;

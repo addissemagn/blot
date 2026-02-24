@@ -12,7 +12,11 @@ const BLOT_PORT = process.env.BLOT_PORT || "8080";
 const BLOT_PROTOCOL = process.env.BLOT_PROTOCOL || "https";
 const BLOT_IPV6 = process.env.BLOT_IPV6 || null;
 
-const BLOT_CDN = BLOT_PROTOCOL + "://cdn." + BLOT_HOST;
+// In serverless (Vercel), use the same host for CDN since cdn subdomain doesn't exist
+// In production, use cdn subdomain for CDN
+const BLOT_CDN = process.cwd().startsWith('/var/task')
+  ? BLOT_PROTOCOL + "://" + BLOT_HOST
+  : BLOT_PROTOCOL + "://cdn." + BLOT_HOST;
 
 // The private IP addresses of the proxies which point to this server
 // we need to know this to flush the cache on each proxy when a blog is updated
@@ -54,15 +58,34 @@ module.exports = {
   // These directories are used by the application
   blot_directory: BLOT_DIRECTORY,
   data_directory: BLOT_DATA_DIRECTORY,
-  views_directory: BLOT_DIRECTORY + "/app/views-built",
+  // views-built is created by the documentation build process (runs during Vercel build via buildCommand)
+  // Fall back to views if views-built doesn't exist (e.g., if build hasn't run or failed)
+  get views_directory() {
+    const fs = require("fs");
+    const viewsBuilt = BLOT_DIRECTORY + "/app/views-built";
+    const views = BLOT_DIRECTORY + "/app/views";
+    try {
+      if (fs.existsSync(viewsBuilt)) {
+        return viewsBuilt;
+      }
+    } catch (e) {
+      // If we can't check, default to views-built
+    }
+    return views;
+  },
   // In serverless environments (like Vercel), use /tmp as it's the only writable directory
   // Detect serverless by checking if we're in /var/task (Vercel) or if /tmp exists and is writable
   tmp_directory: process.env.BLOT_TMP_DIRECTORY || 
     (process.cwd().startsWith('/var/task') ? '/tmp' : BLOT_DATA_DIRECTORY + "/tmp"),
   log_directory:
-    process.env.BLOT_LOG_DIRECTORY || BLOT_DATA_DIRECTORY + "/logs",
-  blog_static_files_dir: BLOT_DATA_DIRECTORY + "/static",
-  blog_folder_dir: BLOT_DATA_DIRECTORY + "/blogs",
+    process.env.BLOT_LOG_DIRECTORY || 
+    (process.cwd().startsWith('/var/task') ? '/tmp/logs' : BLOT_DATA_DIRECTORY + "/logs"),
+  blog_static_files_dir: process.cwd().startsWith('/var/task') 
+    ? '/tmp/static' 
+    : BLOT_DATA_DIRECTORY + "/static",
+  blog_folder_dir: process.cwd().startsWith('/var/task') 
+    ? '/tmp/blogs' 
+    : BLOT_DATA_DIRECTORY + "/blogs",
 
   ip: process.env.BLOT_IP || "127.0.0.1",
   ipv6: BLOT_IPV6,

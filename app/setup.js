@@ -129,6 +129,10 @@ function main(callback) {
   async.series(
     [
       async function () {
+        // Skip featured cache in serverless (not needed)
+        if (process.cwd().startsWith('/var/task')) {
+          return;
+        }
         const featuredDir = path.join(config.data_directory, "featured");
         const featuredFile = path.join(featuredDir, "featured.json");
 
@@ -140,11 +144,20 @@ function main(callback) {
 
       async function () {
         log("Creating required directories");
-        await fs.ensureDir(config.blog_folder_dir);
-        await fs.ensureDir(config.blog_static_files_dir);
-        await fs.ensureDir(config.log_directory);
-        await fs.ensureDir(config.tmp_directory);
-        log("Created required directories");
+        try {
+          await fs.ensureDir(config.blog_folder_dir);
+          await fs.ensureDir(config.blog_static_files_dir);
+          await fs.ensureDir(config.log_directory);
+          await fs.ensureDir(config.tmp_directory);
+          log("Created required directories");
+        } catch (err) {
+          // In serverless, some directories might not be writable, log and continue
+          if (process.cwd().startsWith('/var/task')) {
+            log("Skipping directory creation in serverless environment");
+          } else {
+            throw err;
+          }
+        }
       },
 
       function (callback) {

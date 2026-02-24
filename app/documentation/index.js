@@ -9,6 +9,14 @@ const documentation = Express.Router();
 
 const VIEW_DIRECTORY = config.views_directory;
 
+// Handle CDN paths like /documentation/v-{hash}/documentation.min.css
+documentation.get("/documentation/v-:hash/:file", async (req, res, next) => {
+  // Extract the actual filename from the CDN path
+  const actualPath = "/" + req.params.file;
+  req.path = actualPath; // Override the path so buildOnDemand middleware can handle it
+  next();
+});
+
 documentation.get(["/how/format/*", "/how/files/markdown", "/how/formatting/math"], function (req, res, next) {
   res.locals["show-on-this-page"] = true;
   next();
@@ -31,6 +39,134 @@ for (const path of files) {
     })
   );
 }
+
+// Build and serve CSS/JS in memory if minified files don't exist (for serverless where build might not run)
+const buildOnDemand = async (req, res, next) => {
+  try {
+    const fs = require("fs-extra");
+    const { join } = require("path");
+    const CleanCSS = require("clean-css");
+    const { build } = require("esbuild");
+    const recursiveReadDir = require("helper/recursiveReadDirSync");
+    const buildFinderCSS = require("./tools/finder/build");
+    
+    // Cache for built files (per request lifecycle)
+    // The source views directory is always app/views (not views-built)
+    // __dirname is /var/task/app/documentation, so ../../app/views gives us /var/task/app/views
+    // Or we can use config.blot_directory + "/app/views" for consistency
+    const viewsSource = join(config.blot_directory, "app/views");
+    const filePath = join(VIEW_DIRECTORY, req.path);
+    
+    // Check if file exists first
+    try {
+      await fs.access(filePath);
+      return next(); // File exists, let static middleware handle it
+    } catch (e) {
+      // File doesn't exist, build it in memory
+    }
+  
+  // Build documentation.min.css (handle both direct and CDN paths like /documentation/v-{hash}/documentation.min.css)
+  if (req.path === "/documentation.min.css" || req.path.endsWith("/documentation.min.css")) {
+    try {
+      console.log("Building documentation.min.css in memory for path:", req.path);
+      const cssFilePaths = recursiveReadDir(viewsSource).filter(i => i.endsWith(".css"));
+      const documentationFiles = cssFilePaths.filter(i => !i.includes("/dashboard/"));
+      
+      const cssContents = await Promise.all(
+        documentationFiles.map(file => fs.readFile(file, "utf-8"))
+      );
+      const mergedCSS = cssContents.join("\n\n");
+      const minifiedCSS = new CleanCSS({ level: 2 }).minify(mergedCSS);
+      const finderCSS = await buildFinderCSS();
+      const fullCSS = minifiedCSS.styles + "\n" + finderCSS;
+      
+      res.setHeader("Content-Type", "text/css");
+      res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
+      return res.send(fullCSS);
+    } catch (err) {
+      console.error("Failed to build documentation.min.css:", err);
+      console.error(err.stack);
+      return next();
+    }
+  }
+  
+  // Build dashboard.min.css (handle both direct and CDN paths)
+  if (req.path === "/dashboard.min.css" || req.path.endsWith("/dashboard.min.css")) {
+    try {
+      console.log("Building dashboard.min.css in memory for path:", req.path);
+      const cssFilePaths = recursiveReadDir(viewsSource).filter(i => i.endsWith(".css"));
+      const dashboardFiles = cssFilePaths.filter(i => i.includes("/dashboard/"));
+      
+      const cssContents = await Promise.all(
+        dashboardFiles.map(file => fs.readFile(file, "utf-8"))
+      );
+      const mergedCSS = cssContents.join("\n\n");
+      const minifiedCSS = new CleanCSS({ level: 2 }).minify(mergedCSS);
+      
+      res.setHeader("Content-Type", "text/css");
+      res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
+      return res.send(minifiedCSS.styles);
+    } catch (err) {
+      console.error("Failed to build dashboard.min.css:", err);
+      console.error(err.stack);
+      return next();
+    }
+  }
+  
+  // Build documentation.min.js (handle both direct and CDN paths)
+  if (req.path === "/documentation.min.js" || req.path.endsWith("/documentation.min.js")) {
+    try {
+      console.log("Building documentation.min.js in memory for path:", req.path);
+      const result = await build({
+        entryPoints: [join(viewsSource, "js/documentation.js")],
+        bundle: true,
+        minify: true,
+        target: "es6",
+        write: false, // Don't write to disk
+      });
+      
+      res.setHeader("Content-Type", "application/javascript");
+      res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
+      return res.send(result.outputFiles[0].text);
+    } catch (err) {
+      console.error("Failed to build documentation.min.js:", err);
+      console.error(err.stack);
+      return next();
+    }
+  }
+  
+  // Build dashboard.min.js (handle both direct and CDN paths)
+  if (req.path === "/dashboard.min.js" || req.path.endsWith("/dashboard.min.js")) {
+    try {
+      console.log("Building dashboard.min.js in memory for path:", req.path);
+      const result = await build({
+        entryPoints: [join(viewsSource, "js/dashboard.js")],
+        bundle: true,
+        minify: true,
+        target: "es6",
+        write: false,
+      });
+      
+      res.setHeader("Content-Type", "application/javascript");
+      res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
+      return res.send(result.outputFiles[0].text);
+    } catch (err) {
+      console.error("Failed to build dashboard.min.js:", err);
+      console.error(err.stack);
+      return next();
+    }
+  }
+  
+  next();
+  } catch (err) {
+    // If there's any error in the middleware itself, log it and continue
+    console.error("Error in buildOnDemand middleware:", err);
+    return next(err);
+  }
+};
+
+// Place buildOnDemand BEFORE static file serving so it can intercept requests
+documentation.use(buildOnDemand);
 
 // serve the VIEW_DIRECTORY as static files
 documentation.use(
